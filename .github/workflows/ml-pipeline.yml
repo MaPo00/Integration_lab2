@@ -209,29 +209,36 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
     steps:
-      - name: 🔐 Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
       
-      - name: 🐳 Pull and test image
+      - name: 📦 Download trained model
+        uses: actions/download-artifact@v4
+        with:
+          name: trained-model
+          path: models/
+      
+      - name: 🐳 Build Docker image locally
         run: |
-          # Pull образ
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          
+          docker build -t test-image:local .
+      
+      - name: 🧪 Test Docker container
+        run: |
           # Запускаємо контейнер
-          docker run -d --name api-test -p 8000:5000 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          docker run -d --name api-test -p 8000:5000 test-image:local
           
           # Чекаємо запуску
-          sleep 15
+          echo "Waiting for API to start..."
+          sleep 20
           
           # Тестуємо health endpoint
+          echo "Testing health endpoint..."
           curl -f http://localhost:8000/health || exit 1
           
           echo "✅ Smoke test passed!"
       
       - name: 🧹 Cleanup
         if: always()
-        run: docker stop api-test && docker rm api-test
+        run: |
+          docker stop api-test 2>/dev/null || true
+          docker rm api-test 2>/dev/null || true
