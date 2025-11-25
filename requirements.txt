@@ -1,0 +1,15 @@
+# Core ML dependencies - фіксовані версії для стабільності
+torch==2.1.0
+torchvision==0.16.0
+torchaudio==2.1.0
+numpy==1.24.3
+
+# Audio processing - мінімальний набір для inference
+soundfile==0.12.1
+
+# Web framework
+flask==2.3.3
+
+# Optional: тільки якщо потрібна додаткова аудіо обробка
+librosa==0.10.1
+matplotlib==3.7.2

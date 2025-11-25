@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+*.egg-info/
+
+# Data files (великі датасети)
+data/
+
+# Models (великі файли моделей можна не завантажувати)
+# models/*.pth
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Test audio
+test_audio/
+
+# Benchmark results
+benchmark_results.json

@@ -1,0 +1,83 @@
+# Git та версійний контроль
+.git
+.gitignore
+.gitattributes
+
+# Python cache та temporary файли
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE файли
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS файли
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Документація та звіти (не потрібні в контейнері)
+*.md
+README.md
+analytical_report.md
+training_results.md
+
+# Великі датасети (будемо використовувати тільки модель)
+data/SpeechCommands/
+test_audio/
+
+# Logs та temporary файли
+*.log
+*.tmp
+*.temp
+.cache/
+.pytest_cache/
+
+# Jupyter notebooks
+*.ipynb
+.ipynb_checkpoints/
+
+# Docker файли (не потрібні всередині контейнера)
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Непотрібні скрипти для production
+src/train_model.py
+src/test_model.py
+src/simple_test.py
+src/inference_client.py

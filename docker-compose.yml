@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  # Основний API сервіс
+  speech-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: speech-commands-api
+    ports:
+      - "8000:5000"  # host:container
+    environment:
+      - FLASK_ENV=production
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Labels для документації
+    labels:
+      - "traefik.enable=false"
+      - "description=Speech Commands Recognition API"
+      - "maintainer=Yurii"
+      - "version=1.0"
+
+  # Альтернативний optimized сервіс (коментар для testing)
+  # speech-api-slim:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.production
+  #     target: slim-production
+  #   container_name: speech-commands-api-slim
+  #   ports:
+  #     - "8001:5000"
+  #   environment:
+  #     - FLASK_ENV=production
+  #   restart: unless-stopped
+  #   profiles:
+  #     - slim  # Запуск через: docker-compose --profile slim up
+
+# Додаткові налаштування
+networks:
+  default:
+    driver: bridge
+    
+# Persistent volumes (якщо потрібні логи або моделі)
+volumes:
+  model-data:
+    driver: local
