@@ -43,7 +43,7 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
-          target: builder
+          target: production
           tags: training-image:latest
           load: true
           cache-from: type=gha
@@ -51,6 +51,7 @@ jobs:
       
       - name: 🎓 Run model training in container
         run: |
+          mkdir -p models training_logs
           docker run --name trainer \
             -v ${{ github.workspace }}/models:/app/models \
             -v ${{ github.workspace }}/training_logs:/app/logs \
