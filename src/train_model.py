@@ -236,13 +236,22 @@ def train_model(model_type='simple', epochs=3, batch_size=32, save_model=True):
     return model, best_accuracy, inference_time
 
 if __name__ == "__main__":
+    import argparse
+    
+    # Парсинг аргументів командного рядка
+    parser = argparse.ArgumentParser(description='Train Speech Commands Model')
+    parser.add_argument('--epochs', type=int, default=3, help='Number of training epochs')
+    parser.add_argument('--batch-size', type=int, default=32, help='Batch size for training')
+    parser.add_argument('--model-type', type=str, default='simple', choices=['simple', 'even_simpler'], help='Model architecture')
+    args = parser.parse_args()
+    
     print("🎓 Скрипт навчання Speech Commands моделі")
     print("=" * 50)
     
-    # Налаштування навчання
-    EPOCHS = 3          # Кількість епох (2-5 як у завданні)
-    BATCH_SIZE = 32     # Розмір батча (32 як у завданні)
-    MODEL_TYPE = 'simple'  # Або 'even_simpler' для швидкого тесту
+    # Налаштування навчання з аргументів
+    EPOCHS = args.epochs
+    BATCH_SIZE = args.batch_size
+    MODEL_TYPE = args.model_type
     
     print(f"⚙️ Налаштування:")
     print(f"   Епохи: {EPOCHS}")

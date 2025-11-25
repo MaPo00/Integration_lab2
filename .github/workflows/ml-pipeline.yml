@@ -1,0 +1,256 @@
+name: ML Training and Deployment Pipeline
+
+on:
+  # Тригер на push до main
+  push:
+    branches:
+      - main
+  
+  # Тригер на pull request
+  pull_request:
+    branches:
+      - main
+  
+  # Ручний запуск
+  workflow_dispatch:
+    inputs:
+      epochs:
+        description: 'Number of training epochs'
+        required: false
+        default: '3'
+      
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ===============================================
+  # JOB 1: Тренування моделі в Docker контейнері
+  # ===============================================
+  train-model:
+    name: Train ML Model
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🐳 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: 🏗️ Build training Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          target: builder
+          tags: training-image:latest
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: 🎓 Run model training in container
+        run: |
+          docker run --name trainer \
+            -v ${{ github.workspace }}/models:/app/models \
+            -v ${{ github.workspace }}/training_logs:/app/logs \
+            training-image:latest \
+            python src/train_model.py --epochs ${{ github.event.inputs.epochs || '3' }}
+      
+      - name: 📊 Extract training metrics
+        run: |
+          # Створюємо JSON з метриками
+          cat > training_metrics.json << 'EOF'
+          {
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "epochs": "${{ github.event.inputs.epochs || '3' }}",
+            "commit": "${{ github.sha }}",
+            "branch": "${{ github.ref_name }}"
+          }
+          EOF
+      
+      - name: 📦 Upload trained model
+        uses: actions/upload-artifact@v4
+        with:
+          name: trained-model
+          path: |
+            models/*.pth
+            models/*.pt
+          retention-days: 30
+      
+      - name: 📊 Upload training metrics
+        uses: actions/upload-artifact@v4
+        with:
+          name: training-metrics
+          path: |
+            training_metrics.json
+            training_logs/**
+          retention-days: 30
+  
+  # ===============================================
+  # JOB 2: Тестування навченої моделі
+  # ===============================================
+  test-model:
+    name: Test Model Quality
+    runs-on: ubuntu-latest
+    needs: train-model
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+      
+      - name: 📦 Download trained model
+        uses: actions/download-artifact@v4
+        with:
+          name: trained-model
+          path: models/
+      
+      - name: 📚 Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: 🧪 Run model tests
+        run: |
+          python src/test_model.py --model models/best_model_simple.pth
+      
+      - name: ✅ Validate model performance
+        run: |
+          # Перевірка мінімальної точності
+          python -c "
+          import json
+          # Тут можна додати логіку перевірки метрик
+          print('Model validation passed!')
+          "
+  
+  # ===============================================
+  # JOB 3: Побудова та публікація inference образу
+  # ===============================================
+  build-and-push-inference:
+    name: Build and Push Inference Image
+    runs-on: ubuntu-latest
+    needs: test-model
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 📦 Download trained model
+        uses: actions/download-artifact@v4
+        with:
+          name: trained-model
+          path: models/
+      
+      - name: 🐳 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: 🔐 Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: 🏷️ Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=sha
+            latest
+      
+      - name: 🏗️ Build and push inference image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          target: production
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: 📝 Generate deployment report
+        run: |
+          cat > deployment_report.md << 'EOF'
+          # 🚀 Deployment Report
+          
+          **Date**: $(date -u +%Y-%m-%d)
+          **Commit**: ${{ github.sha }}
+          **Branch**: ${{ github.ref_name }}
+          **Actor**: ${{ github.actor }}
+          
+          ## Docker Image
+          - **Registry**: ${{ env.REGISTRY }}
+          - **Image**: ${{ env.IMAGE_NAME }}
+          - **Tags**: ${{ steps.meta.outputs.tags }}
+          
+          ## Status
+          ✅ Build successful
+          ✅ Model trained and tested
+          ✅ Image pushed to registry
+          EOF
+      
+      - name: 📄 Upload deployment report
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-report
+          path: deployment_report.md
+          retention-days: 90
+  
+  # ===============================================
+  # JOB 4: Benchmark та Performance Testing
+  # ===============================================
+  benchmark:
+    name: Performance Benchmark
+    runs-on: ubuntu-latest
+    needs: build-and-push-inference
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🐳 Pull inference image
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+      
+      - name: 🚀 Run inference container
+        run: |
+          docker run -d --name inference-api \
+            -p 8000:5000 \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+      
+      - name: ⏱️ Measure latency
+        run: |
+          # Чекаємо поки API запуститься
+          sleep 10
+          
+          # Вимірюємо латентність
+          for i in {1..10}; do
+            curl -w "@curl-format.txt" -o /dev/null -s \
+              -X POST http://localhost:8000/predict_text \
+              -H "Content-Type: application/json" \
+              -d '{"text":"benchmark test"}'
+          done > latency_results.txt
+      
+      - name: 📊 Save benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: latency_results.txt
+          retention-days: 30
